@@ -147,9 +147,15 @@
   <!-- ============ HOJE ============ -->
   <section id="hoje" class="aba">
     <div class="carta">
-      <h2>Gasto deste mês</h2>
+      <h2>O que sai da conta</h2>
+      <div class="grande" style="color:var(--vermelho)" id="v-sai">—</div>
+      <div class="nota" id="t-sai">—</div>
+    </div>
+    <div class="carta">
+      <h2>O que vocês registraram</h2>
       <div class="grande" id="v-mes">—</div>
       <div class="nota" id="t-mes">—</div>
+      <div class="mini" id="t-ponte" style="margin-top:10px"></div>
     </div>
     <div class="carta">
       <h2>Dinheiro que dá para usar</h2>
@@ -397,9 +403,20 @@ function carregar(){
     .catch(function(e){ erroGeral('Não consegui carregar: '+e.message); });
 }
 function desenhar(){
+  // O QUE SAI DA CONTA: gasto fixo + as faturas que vencem. E o que mexe
+  // no saldo de verdade.
+  document.getElementById('v-sai').textContent = brl(D.sai_proximo);
+  document.getElementById('t-sai').innerHTML =
+    'em ' + (D.mes_proximo || 'novembro') + ': gasto fixo <b>' + brl(D.fixo_proximo)
+    + '</b> + faturas dos cartões <b>' + brl(D.fatura_proxima) + '</b>';
   document.getElementById('v-mes').textContent = brl(D.gasto_mes);
   document.getElementById('t-mes').innerHTML =
-    'em ' + D.qtd_mes + (D.qtd_mes === 1 ? ' lançamento' : ' lançamentos');
+    'em ' + D.qtd_mes + (D.qtd_mes === 1 ? ' lançamento' : ' lançamentos') + ' neste mês';
+  document.getElementById('t-ponte').innerHTML =
+    'Desses, <b>' + brl(D.credito_mes) + '</b> foram no crédito e só saem da conta quando '
+    + 'a fatura vencer. <b>' + brl(D.da_conta_mes) + '</b> já saíram (fixo, débito, pix, dinheiro).'
+    + '<br>Por isso os dois números são diferentes: um é o que vocês gastaram, '
+    + 'o outro é o que o banco tira.';
 
   document.getElementById('v-caixa').textContent = brl(D.caixa);
   document.getElementById('b-piso').style.width =
