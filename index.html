@@ -68,6 +68,18 @@
   .cartao.on{border-color:var(--tinta);background:#eef1f5}
   .cartao b{display:block;font-size:14px}
   .cartao span{font-size:11px;color:var(--cinza)}
+  .ind{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--linha)}
+  .ind:last-child{border-bottom:0}
+  .bolinha{width:11px;height:11px;border-radius:50%;margin-top:5px;flex:0 0 11px}
+  .ind b{display:block;font-size:15px}
+  .ind em{display:block;font-style:normal;font-size:15px;font-weight:700;margin:1px 0}
+  .ind small{color:var(--cinza);font-size:12px;line-height:1.35}
+  .dica{border-left:4px solid var(--linha);padding:3px 0 3px 12px;margin:14px 0}
+  .dica b{display:block;font-size:15px;margin-bottom:2px}
+  .dica span{font-size:13px;color:var(--cinza)}
+  .meta{height:16px;background:#eef1f5;border-radius:8px;overflow:hidden;margin:10px 0 6px}
+  .meta i{display:block;height:100%;background:var(--verde);border-radius:8px}
+  svg{width:100%;height:auto;display:block}
 </style>
 </head>
 <body>
@@ -173,6 +185,29 @@
     </div>
   </section>
 
+  <!-- ============ PLANO ============ -->
+  <section id="plano" class="aba">
+    <div class="carta">
+      <h2>A meta: R$ 100 mil de patrimônio</h2>
+      <div class="grande" id="p-hoje">—</div>
+      <div class="meta"><i id="p-barra"></i></div>
+      <div class="nota" id="p-falta">—</div>
+    </div>
+    <div class="carta">
+      <h2>Patrimônio mês a mês</h2>
+      <div id="grafico"></div>
+      <div class="mini" id="p-leitura"></div>
+    </div>
+    <div class="carta">
+      <h2>O que eu olho todo mês</h2>
+      <div id="indicadores"></div>
+    </div>
+    <div class="carta">
+      <h2>O que fazer agora</h2>
+      <div id="dicas"></div>
+    </div>
+  </section>
+
   <!-- ============ CARTEIRA ============ -->
   <section id="carteira" class="aba">
     <div class="carta">
@@ -207,7 +242,8 @@
   <a href="#" class="on" onclick="ir('lancar',this)"><i>+</i>Lançar</a>
   <a href="#" onclick="ir('hoje',this)"><i>&#9679;</i>Hoje</a>
   <a href="#" onclick="ir('enxoval',this)"><i>&#9734;</i>Bebê</a>
-  <a href="#" onclick="ir('carteira',this)"><i>&#9650;</i>Carteira</a>
+  <a href="#" onclick="ir('plano',this)"><i>&#9650;</i>Plano</a>
+  <a href="#" onclick="ir('carteira',this)"><i>&#9679;</i>Carteira</a>
   <a href="#" onclick="ir('saldos',this)"><i>&#9632;</i>Saldos</a>
 </nav>
 </div>
@@ -426,7 +462,68 @@ function desenhar(){
     tc += '<tr><td><b>'+D.carteira[c2].ativo+'</b><div class="mini">'+D.carteira[c2].status
         + '</div></td><td>'+brl(D.carteira[c2].hoje)+'</td></tr>';
   document.getElementById('tab-carteira').innerHTML = tc || '<tr><td class="mini">sem dados</td></tr>';
+  desenharPlano();
 }
+function desenharPlano(){
+  var pat = D.patrimonio_total, meta = D.meta || 100000;
+  document.getElementById('p-hoje').textContent = brl(pat);
+  document.getElementById('p-barra').style.width = Math.min(100, 100*pat/meta) + '%';
+  document.getElementById('p-falta').innerHTML =
+    Math.round(100*pat/meta) + '% da meta · faltam <b>' + brl(Math.max(0, meta-pat)) + '</b>'
+    + (D.cruza_meta ? '<br>Do jeito que está, voces cruzam os 100 mil em <b>'
+       + D.cruza_meta + '</b>.' : '');
+
+  // grafico simples, desenhado na mao: sem biblioteca, abre offline
+  var M = D.patrimonio_meses || [];
+  if (!M.length) return;
+  var L = 340, A = 150, pe = 22, topo = Math.max(meta, Math.max.apply(null,
+      M.map(function(m){ return m.valor; }))) * 1.08;
+  var larg = (L - 10) / M.length;
+  var s = '<svg viewBox="0 0 ' + L + ' ' + (A + pe) + '" role="img" aria-label="patrimonio mes a mes">';
+  var yMeta = A - A * meta / topo;
+  s += '<line x1="0" y1="' + yMeta.toFixed(1) + '" x2="' + L + '" y2="' + yMeta.toFixed(1)
+     + '" stroke="#22a05e" stroke-width="1.5" stroke-dasharray="5 4"/>';
+  s += '<text x="3" y="' + (yMeta - 5).toFixed(1) + '" font-size="9" fill="#22a05e">meta 100 mil</text>';
+  for (var i=0;i<M.length;i++){
+    var alt = A * M[i].valor / topo;
+    var cor = M[i].valor >= meta ? '#22a05e' : (M[i].folga > 5000 ? '#2668d6' : '#e8a218');
+    s += '<rect x="' + (5 + i*larg + 2).toFixed(1) + '" y="' + (A-alt).toFixed(1)
+       + '" width="' + (larg-4).toFixed(1) + '" height="' + alt.toFixed(1)
+       + '" rx="2.5" fill="' + cor + '"/>';
+    if (i % 2 === 0 || i === M.length-1)
+      s += '<text x="' + (5 + i*larg + larg/2).toFixed(1) + '" y="' + (A+13)
+         + '" font-size="8" fill="#79849a" text-anchor="middle">' + M[i].mes.slice(0,3) + '</text>';
+  }
+  s += '</svg>';
+  document.getElementById('grafico').innerHTML = s;
+
+  var menor = M[0], maior = M[0];
+  for (var k=0;k<M.length;k++){ if (M[k].valor < menor.valor) menor = M[k];
+                                if (M[k].valor > maior.valor) maior = M[k]; }
+  document.getElementById('p-leitura').innerHTML =
+    'O patrimônio <b>cai até ' + menor.mes + '</b> (' + brl(menor.valor)
+    + ') antes de subir. Isso é o enxoval e a bebê entrando: está no plano, não é erro. '
+    + 'O salto de ' + maior.mes + ' é a venda do leilão.';
+
+  var CORES = {ok:'#22a05e', atencao:'#e8a218', risco:'#d64038'};
+  var h = '';
+  for (var n=0;n<(D.indicadores||[]).length;n++){
+    var x = D.indicadores[n];
+    h += '<div class="ind"><span class="bolinha" style="background:' + (CORES[x.estado]||'#79849a')
+       + '"></span><div><b>' + x.nome + '</b><em>' + x.valor + '</em><small>'
+       + x.porque + '</small></div></div>';
+  }
+  document.getElementById('indicadores').innerHTML = h;
+
+  var d = '';
+  for (var m=0;m<(D.dicas||[]).length;m++){
+    var y = D.dicas[m];
+    d += '<div class="dica" style="border-color:' + (CORES[y.e]||'#79849a') + '"><b>'
+       + y.t + '</b><span>' + y.x + '</span></div>';
+  }
+  document.getElementById('dicas').innerHTML = d;
+}
+
 function enviar(tipo, dados, alvo, feito){
   aviso(alvo,'salvando...','av');
   chamar('/painel-salvar',{method:'POST',body:JSON.stringify({tipo:tipo,dados:dados})})
