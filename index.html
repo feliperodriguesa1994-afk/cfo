@@ -80,6 +80,11 @@
   .meta{height:16px;background:#eef1f5;border-radius:8px;overflow:hidden;margin:10px 0 6px}
   .meta i{display:block;height:100%;background:var(--verde);border-radius:8px}
   svg{width:100%;height:auto;display:block}
+  .foto{border:2px dashed var(--linha);border-radius:14px;padding:18px;text-align:center;
+        margin-bottom:16px;background:#fff;cursor:pointer}
+  .foto b{display:block;font-size:15px;margin-bottom:2px}
+  .foto span{font-size:12px;color:var(--cinza)}
+  .foto.lendo{border-color:var(--azul);background:#f2f7ff}
 </style>
 </head>
 <body>
@@ -110,6 +115,12 @@
   <section id="lancar" class="aba on">
     <div class="carta">
       <h2>Quanto foi?</h2>
+      <label for="arquivo" class="foto" id="caixa-foto">
+        <b>📷 Tirar foto do cupom</b>
+        <span>eu leio o valor e preencho para você conferir</span>
+      </label>
+      <input type="file" id="arquivo" accept="image/*" capture="environment"
+             style="display:none" onchange="mandarFoto(this)">
       <input id="l-valor" class="valor" inputmode="decimal" placeholder="0,00">
 
       <label>No que foi?</label>
@@ -539,6 +550,47 @@ function salvarSaldos(){
     lista.push({nome:D.saldos[campos[i].getAttribute('data-saldo')].nome, valor:num(campos[i].value)});
   enviar('saldos',{saldos:lista, fgts:num(document.getElementById('s-fgts').value)},'r-saldos');
 }
+function mandarFoto(el){
+  var arq = el.files && el.files[0];
+  if (!arq) return;
+  var caixa = document.getElementById('caixa-foto');
+  caixa.className = 'foto lendo';
+  caixa.innerHTML = '<b>lendo a foto...</b><span>isso leva uns segundos</span>';
+  var leitor = new FileReader();
+  leitor.onload = function(){
+    var b64 = String(leitor.result).split(',')[1] || '';
+    chamar('/painel-nota', { method:'POST',
+      body: JSON.stringify({ imagem: b64, tipo: arq.type || 'image/jpeg' }) })
+      .then(function(j){
+        caixa.className = 'foto';
+        if (j.erro) {
+          caixa.innerHTML = '<b>Não consegui ler</b><span>' + j.erro + '</span>';
+          return;
+        }
+        document.getElementById('l-valor').value = j.valor.toFixed(2).replace('.', ',');
+        document.getElementById('l-desc').value = j.descricao;
+        categoriaEscolhida = j.categoria || 'Outros';
+        // marca o cartao que a nota indicou
+        var ds = document.getElementById('cartoes').children;
+        for (var i=0;i<ds.length;i++){
+          ds[i].className = ds[i].getAttribute('data-v') === j.fonte ? 'cartao on' : 'cartao';
+          if (ds[i].getAttribute('data-v') === j.fonte) fonteEscolhida = j.fonte;
+        }
+        var conf = Math.round((j.confianca || 0) * 100);
+        caixa.innerHTML = '<b>Li: ' + brl(j.valor) + '</b><span>'
+          + j.descricao + ' · ' + conf + '% de certeza'
+          + (conf < 70 ? ' — confira o valor antes de lançar' : '')
+          + '<br>Toque aqui para mandar outra</span>';
+      })
+      .catch(function(e){
+        caixa.className = 'foto';
+        caixa.innerHTML = '<b>Falhou</b><span>' + e.message + '</span>';
+      });
+  };
+  leitor.readAsDataURL(arq);
+  el.value = '';
+}
+
 function lancar(){
   var desc = document.getElementById('l-desc').value.trim();
   var valor = num(document.getElementById('l-valor').value);
@@ -554,6 +606,8 @@ function lancar(){
       document.getElementById('l-valor').value='';
       var cs = document.getElementById('sugestoes').children;
       for (var k=0;k<cs.length;k++) cs[k].className='chip';
+      document.getElementById('caixa-foto').innerHTML =
+        '<b>📷 Tirar foto do cupom</b><span>eu leio o valor e preencho para você conferir</span>';
       aviso('r-lancar', 'Lançado: <b>' + brl(valor) + '</b> em ' + desc
         + '<div class="mini">' + nomeCartao + ' · ' + dia + '</div>', 'ok');
     });
