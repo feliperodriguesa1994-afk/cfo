@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>CFO</title>
+<style>
+  :root{
+    --fundo:#f6f7f9; --carta:#fff; --tinta:#181c24; --cinza:#79849a;
+    --linha:#e4e8ef; --verde:#22a05e; --vermelho:#d64038; --amarelo:#e8a218;
+    --azul:#2668d6; --lilas:#7a56cc;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--fundo);color:var(--tinta);
+       font:16px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif}
+  body.dentro{padding-bottom:86px}
+  header{background:var(--tinta);color:#fff;padding:16px 20px;
+         display:flex;justify-content:space-between;align-items:center}
+  header h1{margin:0;font-size:18px}
+  header p{margin:2px 0 0;font-size:12px;color:#9aa5b8}
+  header button{width:auto;margin:0;padding:7px 12px;font-size:12px;background:#2c3342}
+  main{padding:16px}
+  .carta{background:var(--carta);border:1px solid var(--linha);border-radius:16px;
+         padding:16px;margin-bottom:14px}
+  .carta h2{margin:0 0 10px;font-size:13px;letter-spacing:.7px;text-transform:uppercase;color:var(--cinza)}
+  .grande{font-size:30px;font-weight:700;margin:2px 0}
+  .nota{font-size:13px;color:var(--cinza)}
+  .linha{display:flex;justify-content:space-between;align-items:center;
+         padding:11px 0;border-bottom:1px solid var(--linha)}
+  .linha:last-child{border-bottom:0}
+  label{display:block;font-size:13px;color:var(--cinza);margin:14px 0 6px}
+  input,select{width:100%;padding:13px;border:1px solid var(--linha);border-radius:12px;
+               font-size:16px;background:#fff;color:var(--tinta);font-family:inherit}
+  input:focus,select:focus{outline:2px solid var(--azul);outline-offset:-1px}
+  input.valor{font-size:34px;font-weight:700;text-align:center;padding:16px;letter-spacing:-.5px}
+  button{width:100%;padding:15px;border:0;border-radius:13px;background:var(--tinta);
+         color:#fff;font-size:16px;font-weight:600;margin-top:16px;font-family:inherit}
+  button:active{opacity:.75}
+  nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--linha);
+      display:flex;padding:6px 4px env(safe-area-inset-bottom)}
+  nav a{flex:1;text-align:center;padding:9px 2px;font-size:11px;color:var(--cinza);
+        text-decoration:none;border-radius:10px}
+  nav a.on{color:var(--tinta);background:#eef1f5;font-weight:700}
+  nav a i{display:block;font-size:18px;font-style:normal;margin-bottom:1px}
+  .aba{display:none} .aba.on{display:block}
+  .barra{height:10px;background:#eef1f5;border-radius:6px;overflow:hidden;margin:10px 0 6px}
+  .barra i{display:block;height:100%;border-radius:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td{padding:9px 0;border-bottom:1px solid var(--linha);vertical-align:top}
+  td:last-child{text-align:right;font-weight:600;white-space:nowrap}
+  .av{background:#fff9e8;border-color:#f0d696}
+  .er{background:#fdeceb;border-color:#f3c3bf;color:#8f2a24}
+  .ok{background:#e8f6ee;border-color:#b6e2c8;color:#15663c}
+  .mini{font-size:12px;color:var(--cinza);margin-top:2px}
+  #entrada{max-width:380px;margin:0 auto;padding:46px 20px}
+  #entrada h1{font-size:28px;margin:0 0 4px}
+  #entrada p{color:var(--cinza);margin:0 0 22px;font-size:14px}
+  .so-master{display:none}
+  body.master .so-master{display:block}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{padding:9px 14px;border:1px solid var(--linha);border-radius:99px;background:#fff;
+        font-size:14px;cursor:pointer;user-select:none}
+  .chip.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+  .cartoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .cartao{border:1px solid var(--linha);border-radius:13px;padding:11px 12px;background:#fff;
+          cursor:pointer;user-select:none}
+  .cartao.on{border-color:var(--tinta);background:#eef1f5}
+  .cartao b{display:block;font-size:14px}
+  .cartao span{font-size:11px;color:var(--cinza)}
+</style>
+</head>
+<body>
+
+<div id="entrada">
+  <h1>CFO</h1>
+  <p>Entre para ver e lançar</p>
+  <div class="carta">
+    <label>Usuário</label>
+    <input id="u" autocomplete="username" autocapitalize="none" placeholder="usuário">
+    <label>Senha</label>
+    <input id="s" type="password" autocomplete="current-password">
+    <button onclick="entrar()">Entrar</button>
+    <div id="r-entrar"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <div><h1>CFO</h1><p id="quem">—</p></div>
+  <button onclick="sair()">Sair</button>
+</header>
+
+<main>
+  <div id="erro" class="carta er" style="display:none"></div>
+
+  <!-- ============ LANÇAR: a tela principal ============ -->
+  <section id="lancar" class="aba on">
+    <div class="carta">
+      <h2>Quanto foi?</h2>
+      <input id="l-valor" class="valor" inputmode="decimal" placeholder="0,00">
+
+      <label>No que foi?</label>
+      <input id="l-desc" placeholder="mercado, almoço, farmácia...">
+      <div class="chips" id="sugestoes"></div>
+
+      <label>Pagou com o quê?</label>
+      <div class="cartoes" id="cartoes"></div>
+
+      <button onclick="lancar()">Lançar gasto</button>
+      <div id="r-lancar"></div>
+      <div class="mini" style="margin-top:12px">
+        No crédito, o gasto entra na fatura do cartão. No débito, pix ou
+        dinheiro, sai da conta na hora.
+      </div>
+    </div>
+
+    <div class="carta">
+      <h2>Últimos lançamentos</h2>
+      <table id="tab-ultimos"></table>
+    </div>
+  </section>
+
+  <!-- ============ HOJE ============ -->
+  <section id="hoje" class="aba">
+    <div class="carta">
+      <h2>Gasto deste mês</h2>
+      <div class="grande" id="v-mes">—</div>
+      <div class="nota" id="t-mes">—</div>
+    </div>
+    <div class="carta">
+      <h2>Dinheiro que dá para usar</h2>
+      <div class="grande" style="color:var(--verde)" id="v-caixa">—</div>
+      <div class="barra"><i id="b-piso" style="background:var(--vermelho)"></i></div>
+      <div class="nota" id="t-piso">—</div>
+    </div>
+    <div class="carta">
+      <h2>Patrimônio</h2>
+      <div id="lista-patrimonio"></div>
+      <div class="mini" id="t-fgts"></div>
+    </div>
+    <div class="carta">
+      <h2>Próximos meses</h2>
+      <table id="tab-meses"></table>
+      <div class="mini">Verde é folgado, amarelo é apertado.</div>
+    </div>
+  </section>
+
+  <!-- ============ BEBÊ ============ -->
+  <section id="enxoval" class="aba">
+    <div class="carta">
+      <h2>Enxoval da bebê</h2>
+      <div class="grande" id="e-gasto">—</div>
+      <div class="barra"><i id="e-barra"></i></div>
+      <div class="nota" id="e-resta">—</div>
+    </div>
+    <div class="carta">
+      <h2>Registrar compra</h2>
+      <label>O que comprou</label>
+      <input id="e-item" placeholder="carrinho, berço, banheira...">
+      <label>Valor total</label>
+      <input id="e-valor" inputmode="decimal" placeholder="1890,00">
+      <label>Em quantas vezes</label>
+      <input id="e-parc" inputmode="numeric" value="1">
+      <label>Pagou com o quê?</label>
+      <div class="cartoes" id="cartoes-e"></div>
+      <button onclick="comprar()">Registrar compra</button>
+      <div id="r-enxoval"></div>
+    </div>
+    <div class="carta">
+      <h2>Já comprado</h2>
+      <table id="tab-enxoval"></table>
+    </div>
+  </section>
+
+  <!-- ============ CARTEIRA ============ -->
+  <section id="carteira" class="aba">
+    <div class="carta">
+      <h2>Ações e fundos</h2>
+      <div class="grande" id="c-total">—</div>
+      <div class="nota" id="c-result">—</div>
+    </div>
+    <div class="carta">
+      <h2>Posições</h2>
+      <table id="tab-carteira"></table>
+    </div>
+  </section>
+
+  <!-- ============ SALDOS ============ -->
+  <section id="saldos" class="aba">
+    <div class="carta so-master">
+      <h2>Atualizar os saldos</h2>
+      <div class="nota">Mude só o que mudou.</div>
+      <div id="campos-saldos"></div>
+      <button onclick="salvarSaldos()">Salvar saldos</button>
+      <div id="r-saldos"></div>
+    </div>
+    <div class="carta" id="saldos-leitura" style="display:none">
+      <h2>Saldos</h2>
+      <div id="lista-saldos"></div>
+      <div class="mini">Só o usuário principal muda estes valores.</div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <a href="#" class="on" onclick="ir('lancar',this)"><i>+</i>Lançar</a>
+  <a href="#" onclick="ir('hoje',this)"><i>&#9679;</i>Hoje</a>
+  <a href="#" onclick="ir('enxoval',this)"><i>&#9734;</i>Bebê</a>
+  <a href="#" onclick="ir('carteira',this)"><i>&#9650;</i>Carteira</a>
+  <a href="#" onclick="ir('saldos',this)"><i>&#9632;</i>Saldos</a>
+</nav>
+</div>
+
+<script>
+window.CFO_API = "https://n8n.srv1821241.hstgr.cloud/webhook";
+
+var API = window.CFO_API || 'https://n8n.srv1821241.hstgr.cloud/webhook';
+var TOKEN = '', PAPEL = '', D = null;
+var fonteEscolhida = 'santander';
+var fonteEnxoval = 'santander';
+var categoriaEscolhida = 'Outros';
+
+var CARTOES = [
+  {v:'santander', n:'Santander', d:'fatura dia 16'},
+  {v:'c6',        n:'C6 Carbon', d:'fatura dia 1'},
+  {v:'nubank_f',  n:'Nubank (ele)', d:'fatura dia 5'},
+  {v:'nubank_l',  n:'Nubank (ela)', d:'fatura dia 25'},
+  {v:'porto',     n:'Porto', d:'fatura dia 15'},
+  {v:'debito',    n:'Débito', d:'sai da conta na hora'},
+  {v:'pix',       n:'Pix', d:'sai da conta na hora'},
+  {v:'dinheiro',  n:'Dinheiro', d:'sai da conta na hora'}
+];
+// Sugestões para não precisar digitar. Cada uma já leva a categoria certa.
+var SUGESTOES = [
+  ['Mercado','Alimentação'], ['Almoço','Alimentação'], ['Padaria','Alimentação'],
+  ['Farmácia','Saúde'], ['Uber','Transporte'], ['Gasolina','Transporte'],
+  ['Bebê','Pessoais'], ['Casa','Moradia'], ['Lazer','Lazer'], ['Outros','Outros']
+];
+
+function brl(v){
+  v = Number(v) || 0;
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function num(s){
+  s = String(s == null ? '' : s).trim();
+  if (!s) return 0;
+  return (s.indexOf(',') >= 0 ? Number(s.replace(/\./g,'').replace(',','.')) : Number(s)) || 0;
+}
+function ir(id, el){
+  var secs = document.querySelectorAll('.aba');
+  for (var i=0;i<secs.length;i++) secs[i].className = 'aba' + (secs[i].id===id ? ' on' : '');
+  var as = document.querySelectorAll('nav a');
+  for (var j=0;j<as.length;j++) as[j].className = '';
+  if (el) el.className = 'on';
+  window.scrollTo(0,0);
+  return false;
+}
+function aviso(el, texto, tipo){
+  document.getElementById(el).innerHTML =
+    '<div class="carta ' + tipo + '" style="margin:14px 0 0">' + texto + '</div>';
+}
+function erroGeral(t){
+  var e = document.getElementById('erro');
+  if (!e) return; e.style.display='block'; e.textContent = t;
+}
+function hashSenha(usuario, senha){
+  var bytes = new TextEncoder().encode('cfo|' + String(usuario).toLowerCase().trim() + '|' + senha);
+  return crypto.subtle.digest('SHA-256', bytes).then(function(buf){
+    return Array.prototype.slice.call(new Uint8Array(buf))
+      .map(function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+  });
+}
+function entrar(){
+  var u = document.getElementById('u').value.trim();
+  var s = document.getElementById('s').value;
+  if (!u || !s) { aviso('r-entrar','Preencha usuário e senha.','er'); return; }
+  aviso('r-entrar','entrando...','av');
+  hashSenha(u, s).then(function(h){
+    return fetch(API + '/painel-login', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usuario:u, hash:h}) });
+  }).then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok) { aviso('r-entrar', j.erro || 'Usuário ou senha errados.','er'); return; }
+      TOKEN = j.token; PAPEL = j.papel;
+      try { localStorage.setItem('cfo_t',TOKEN); localStorage.setItem('cfo_p',PAPEL);
+            localStorage.setItem('cfo_n',j.nome); } catch(e){}
+      abrirApp(j.nome, j.papel);
+    }).catch(function(e){ aviso('r-entrar','Não consegui entrar: '+e.message,'er'); });
+}
+function sair(){
+  try { localStorage.clear(); } catch(e){}
+  location.reload();
+}
+function abrirApp(nome, papel){
+  document.getElementById('entrada').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.body.className = 'dentro' + (papel==='master' ? ' master' : '');
+  document.getElementById('quem').textContent =
+    nome + (papel==='master' ? '' : ' · lança e visualiza');
+  if (papel !== 'master') document.getElementById('saldos-leitura').style.display='block';
+
+  var h = '';
+  for (var i=0;i<CARTOES.length;i++)
+    h += '<div class="cartao' + (CARTOES[i].v===fonteEscolhida ? ' on':'')
+       + '" data-v="' + CARTOES[i].v + '"><b>' + CARTOES[i].n + '</b><span>'
+       + CARTOES[i].d + '</span></div>';
+  var box = document.getElementById('cartoes');
+  var boxE = document.getElementById('cartoes-e');
+  box.innerHTML = h; boxE.innerHTML = h;
+  ligaCartoes(box, function(v){ fonteEscolhida = v; });
+  ligaCartoes(boxE, function(v){ fonteEnxoval = v; });
+
+  var c = '';
+  for (var k=0;k<SUGESTOES.length;k++)
+    c += '<span class="chip" data-t="' + SUGESTOES[k][0] + '" data-c="' + SUGESTOES[k][1]
+       + '">' + SUGESTOES[k][0] + '</span>';
+  var sug = document.getElementById('sugestoes');
+  sug.innerHTML = c;
+  var cs = sug.children;
+  for (var z=0;z<cs.length;z++) cs[z].onclick = function(){
+    document.getElementById('l-desc').value = this.getAttribute('data-t');
+    categoriaEscolhida = this.getAttribute('data-c');
+    for (var y=0;y<cs.length;y++) cs[y].className = 'chip';
+    this.className = 'chip on';
+  };
+  carregar();
+}
+function ligaCartoes(box, escolheu){
+  var ds = box.children;
+  for (var i=0;i<ds.length;i++) ds[i].onclick = function(){
+    for (var k=0;k<ds.length;k++) ds[k].className = 'cartao';
+    this.className = 'cartao on';
+    escolheu(this.getAttribute('data-v'));
+  };
+}
+function chamar(caminho, opcoes){
+  opcoes = opcoes || {};
+  opcoes.headers = Object.assign({'Content-Type':'application/json'},
+                                 opcoes.headers||{}, {'X-CFO-Token':TOKEN});
+  return fetch(API + caminho, opcoes).then(function(r){
+    if (r.status === 401) { sair(); throw new Error('sessão expirada'); }
+    return r.json();
+  });
+}
+function carregar(){
+  chamar('/painel-dados')
+    .then(function(j){ if (j.erro) { erroGeral(j.erro); return; } D = j; desenhar(); })
+    .catch(function(e){ erroGeral('Não consegui carregar: '+e.message); });
+}
+function desenhar(){
+  document.getElementById('v-mes').textContent = brl(D.gasto_mes);
+  document.getElementById('t-mes').innerHTML =
+    'em ' + D.qtd_mes + (D.qtd_mes === 1 ? ' lançamento' : ' lançamentos');
+
+  document.getElementById('v-caixa').textContent = brl(D.caixa);
+  document.getElementById('b-piso').style.width =
+    Math.min(100, 100*D.piso/Math.max(D.caixa,D.piso)) + '%';
+  document.getElementById('t-piso').innerHTML =
+    'Reserva intocável: <b>' + brl(D.piso) + '</b> · sobra <b style="color:var(--verde)">'
+    + brl(D.caixa-D.piso) + '</b><br>Em fevereiro a reserva sobe para <b>'
+    + brl(D.piso_bebe) + '</b>, com a bebê.';
+
+  var CORES = {'Caixa':'var(--verde)','Ações e fundos':'var(--azul)','Imóvel de leilão':'var(--lilas)'};
+  var h='';
+  for (var i=0;i<D.patrimonio.length;i++)
+    h += '<div class="linha"><span>'+D.patrimonio[i].nome+'</span><b style="color:'
+       + (CORES[D.patrimonio[i].nome]||'var(--tinta)')+'">'+brl(D.patrimonio[i].valor)+'</b></div>';
+  h += '<div class="linha"><span><b>TOTAL</b></span><b>'+brl(D.patrimonio_total)+'</b></div>';
+  document.getElementById('lista-patrimonio').innerHTML = h;
+  document.getElementById('t-fgts').textContent =
+    'O FGTS de ' + brl(D.fgts) + ' fica fora: só vira dinheiro na venda, em setembro de 2027.';
+
+  var t='';
+  for (var m=0;m<D.meses.length;m++){
+    var x=D.meses[m];
+    var cor = x.folga>10000 ? 'var(--verde)' : (x.folga>0 ? 'var(--amarelo)' : 'var(--vermelho)');
+    t += '<tr><td>'+x.mes+'</td><td style="color:'+cor+'">'+brl(x.caixa)+'</td></tr>';
+  }
+  document.getElementById('tab-meses').innerHTML = t;
+
+  var tu='';
+  for (var u=0;u<D.ultimos.length;u++){
+    var g=D.ultimos[u];
+    tu += '<tr><td>'+g.descricao+'<div class="mini">'+g.data+' · '+g.fonte+'</div></td><td>'
+        + brl(g.valor)+'</td></tr>';
+  }
+  document.getElementById('tab-ultimos').innerHTML = tu
+    || '<tr><td class="mini">nada lançado ainda neste mês</td></tr>';
+
+  var s='', sl='';
+  for (var k=0;k<D.saldos.length;k++){
+    s += '<label>'+D.saldos[k].nome+'</label><input data-saldo="'+k+'" inputmode="decimal" value="'
+       + D.saldos[k].valor.toFixed(2).replace('.',',')+'">';
+    sl += '<div class="linha"><span>'+D.saldos[k].nome+'</span><b>'+brl(D.saldos[k].valor)+'</b></div>';
+  }
+  s += '<label>FGTS (saldo de hoje)</label><input id="s-fgts" inputmode="decimal" value="'
+     + D.fgts.toFixed(2).replace('.',',')+'">';
+  document.getElementById('campos-saldos').innerHTML = s;
+  document.getElementById('lista-saldos').innerHTML = sl;
+
+  document.getElementById('e-gasto').textContent = brl(D.enxoval_gasto);
+  var pe = Math.min(100, 100*D.enxoval_gasto/D.enxoval_teto);
+  var be = document.getElementById('e-barra');
+  be.style.width = pe+'%';
+  be.style.background = pe<80 ? 'var(--verde)' : (pe<100 ? 'var(--amarelo)' : 'var(--vermelho)');
+  document.getElementById('e-resta').innerHTML =
+    'de um teto de <b>'+brl(D.enxoval_teto)+'</b> · ainda cabem <b>'
+    + brl(D.enxoval_teto-D.enxoval_gasto)+'</b>';
+  var te='';
+  for (var e=0;e<D.enxoval.length;e++)
+    te += '<tr><td>'+D.enxoval[e].item+'<div class="mini">'+D.enxoval[e].parcelas+'x de '
+        + brl(D.enxoval[e].parcela)+' · 1ª em '+D.enxoval[e].primeira+'</div></td><td>'
+        + brl(D.enxoval[e].total)+'</td></tr>';
+  document.getElementById('tab-enxoval').innerHTML = te || '<tr><td class="mini">nada ainda</td></tr>';
+
+  document.getElementById('c-total').textContent = brl(D.carteira_hoje);
+  var res = D.carteira_hoje - D.carteira_investido;
+  document.getElementById('c-result').innerHTML = D.carteira_investido
+    ? 'investido '+brl(D.carteira_investido)+' · <b style="color:'
+      + (res>=0?'var(--verde)':'var(--vermelho)')+'">'+brl(res)+'</b>'
+    : 'não consegui ler a carteira agora';
+  var tc='';
+  for (var c2=0;c2<D.carteira.length;c2++)
+    tc += '<tr><td><b>'+D.carteira[c2].ativo+'</b><div class="mini">'+D.carteira[c2].status
+        + '</div></td><td>'+brl(D.carteira[c2].hoje)+'</td></tr>';
+  document.getElementById('tab-carteira').innerHTML = tc || '<tr><td class="mini">sem dados</td></tr>';
+}
+function enviar(tipo, dados, alvo, feito){
+  aviso(alvo,'salvando...','av');
+  chamar('/painel-salvar',{method:'POST',body:JSON.stringify({tipo:tipo,dados:dados})})
+    .then(function(j){
+      if (j.erro) { aviso(alvo, j.erro, 'er'); return; }
+      if (feito) feito(); else aviso(alvo, j.mensagem || 'Pronto.', 'ok');
+      carregar();
+    }).catch(function(e){ aviso(alvo,'Falhou: '+e.message,'er'); });
+}
+function salvarSaldos(){
+  var campos = document.querySelectorAll('[data-saldo]'), lista=[];
+  for (var i=0;i<campos.length;i++)
+    lista.push({nome:D.saldos[campos[i].getAttribute('data-saldo')].nome, valor:num(campos[i].value)});
+  enviar('saldos',{saldos:lista, fgts:num(document.getElementById('s-fgts').value)},'r-saldos');
+}
+function lancar(){
+  var desc = document.getElementById('l-desc').value.trim();
+  var valor = num(document.getElementById('l-valor').value);
+  if (!valor) { aviso('r-lancar','Falta o valor.','er'); return; }
+  if (!desc) { aviso('r-lancar','Escreve no que foi, ou toca numa sugestão.','er'); return; }
+  var cartao = fonteEscolhida, dia = '';
+  var nomeCartao = cartao;
+  for (var i=0;i<CARTOES.length;i++) if (CARTOES[i].v===cartao) { dia = CARTOES[i].d; nomeCartao = CARTOES[i].n; }
+  enviar('lancamento',
+    {descricao:desc, valor:valor, registro:'despesa', fonte:cartao, categoria:categoriaEscolhida},
+    'r-lancar', function(){
+      document.getElementById('l-desc').value='';
+      document.getElementById('l-valor').value='';
+      var cs = document.getElementById('sugestoes').children;
+      for (var k=0;k<cs.length;k++) cs[k].className='chip';
+      aviso('r-lancar', 'Lançado: <b>' + brl(valor) + '</b> em ' + desc
+        + '<div class="mini">' + nomeCartao + ' · ' + dia + '</div>', 'ok');
+    });
+}
+function comprar(){
+  var item = document.getElementById('e-item').value.trim();
+  var valor = num(document.getElementById('e-valor').value);
+  var parc = Math.max(1, parseInt(document.getElementById('e-parc').value,10)||1);
+  if (!item) { aviso('r-enxoval','O que comprou?','er'); return; }
+  if (!valor) { aviso('r-enxoval','Falta o valor.','er'); return; }
+  enviar('enxoval',{item:item,total:valor,parcelas:parc,onde:fonteEnxoval},'r-enxoval',function(){
+    document.getElementById('e-item').value='';
+    document.getElementById('e-valor').value='';
+    document.getElementById('e-parc').value='1';
+    aviso('r-enxoval','Registrado: <b>'+brl(valor)+'</b> em '+parc+'x', 'ok');
+  });
+}
+(function(){
+  try {
+    var t = localStorage.getItem('cfo_t');
+    if (t) { TOKEN=t; PAPEL=localStorage.getItem('cfo_p')||'';
+             abrirApp(localStorage.getItem('cfo_n')||'', PAPEL); }
+  } catch(e){}
+})();
+</script>
+</body>
+</html>
