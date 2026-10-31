@@ -211,9 +211,21 @@
       <div class="nota" id="p-falta">—</div>
     </div>
     <div class="carta">
+      <h2>O mês mais apertado</h2>
+      <div class="grande" id="s-pior">—</div>
+      <div class="nota" id="s-pior-txt">—</div>
+    </div>
+    <div class="carta">
       <h2>Patrimônio mês a mês</h2>
       <div id="grafico"></div>
       <div class="mini" id="p-leitura"></div>
+    </div>
+    <div class="carta">
+      <h2>Entrou comissão. O que faço com ela?</h2>
+      <label>Quanto, em bruto</label>
+      <input id="c-bruto" class="valor" inputmode="decimal" placeholder="10.000,00"
+             oninput="simular()">
+      <div id="c-saida"></div>
     </div>
     <div class="carta">
       <h2>O que eu olho todo mês</h2>
@@ -533,6 +545,17 @@ function desenharPlano(){
     + ') antes de subir. Isso é o enxoval e a bebê entrando: está no plano, não é erro. '
     + 'O salto de ' + maior.mes + ' é a venda do leilão.';
 
+  if (D.pior_saldo) {
+    document.getElementById('s-pior').textContent = brl(D.pior_saldo.caixa);
+    document.getElementById('s-pior-txt').innerHTML =
+      'é o menor saldo do período, em <b>' + D.pior_saldo.mes + '</b>.<br>'
+      + 'Desses, <b>' + brl(D.pior_saldo.piso) + '</b> são a reserva que não se toca '
+      + '(6 meses de gasto fixo, já com a bebê) e <b style="color:var(--verde)">'
+      + brl(D.pior_saldo.caixa - D.pior_saldo.piso) + '</b> sobram em cima dela.<br>'
+      + '<b>Vocês nunca ficam com pouco dinheiro na conta</b> — o aperto é na sobra, não no saldo.';
+  }
+  simular();
+
   var CORES = {ok:'#22a05e', atencao:'#e8a218', risco:'#d64038'};
   var h = '';
   for (var n=0;n<(D.indicadores||[]).length;n++){
@@ -550,6 +573,73 @@ function desenharPlano(){
        + y.t + '</b><span>' + y.x + '</span></div>';
   }
   document.getElementById('dicas').innerHTML = d;
+}
+
+// Simulador: entrou comissao, para onde ela vai?
+// A conta roda aqui na tela, entao responde enquanto voce digita.
+function simular(){
+  var el = document.getElementById('c-saida');
+  if (!el || !D || !D.carro) return;
+  var bruto = num((document.getElementById('c-bruto')||{}).value || '');
+  if (!bruto) {
+    el.innerHTML = '<div class="mini" style="margin-top:10px">Digite o valor bruto '
+      + 'e eu comparo as opções com os seus números.</div>';
+    return;
+  }
+  var C = D.carro, cdi = D.taxa, liq = bruto * D.razao_liquido;
+  var meses = C.parcelas_ate_set;
+
+  // A) fica na caixinha ate setembro/27
+  var caixinha = liq * Math.pow(1 + cdi, meses);
+  var ganhoA = caixinha - liq;
+
+  // B) antecipa as ultimas parcelas. Cada uma custa o valor presente pela
+  // taxa da antecipacao, e tira da quitacao o valor presente pela do contrato.
+  var gasto = 0, qtd = 0, tiraDaQuitacao = 0;
+  for (var n = 36; n >= 26; n--) {
+    var custo = C.parcela / Math.pow(1 + C.taxa_antecipa, n - 14);
+    if (gasto + custo > liq) break;
+    gasto += custo; qtd++;
+    tiraDaQuitacao += C.parcela / Math.pow(1 + C.taxa, n - 25);
+  }
+  var sobra = liq - gasto;
+  var ganhoB = sobra * (Math.pow(1 + cdi, meses) - 1) + (tiraDaQuitacao - gasto);
+
+  // C) da para quitar o carro inteiro agora?
+  var podeQuitar = liq >= C.saldo;
+
+  var melhor = ganhoB > ganhoA ? 'B' : 'A';
+  var s = '<div class="nota" style="margin:12px 0 4px">De <b>' + brl(bruto)
+        + '</b> brutos sobram <b>' + brl(liq) + '</b> no bolso (cada real bruto vira '
+        + 'R$ 0,85: o INSS já está no teto, só o IR morde).</div>';
+
+  s += '<div class="dica" style="border-color:' + (melhor === 'A' ? '#22a05e' : '#79849a') + '">'
+     + '<b>Deixar na caixinha</b><span>vira <b>' + brl(caixinha) + '</b> em setembro/27 · '
+     + 'ganho de ' + brl(ganhoA) + '</span></div>';
+
+  if (qtd > 0) {
+    s += '<div class="dica" style="border-color:' + (melhor === 'B' ? '#22a05e' : '#79849a') + '">'
+       + '<b>Antecipar ' + qtd + (qtd === 1 ? ' parcela' : ' parcelas') + ' do carro</b><span>'
+       + 'custa ' + brl(gasto) + ' e tira ' + brl(tiraDaQuitacao) + ' da quitação de setembro · '
+       + 'ganho de ' + brl(ganhoB) + '</span></div>';
+  }
+  if (podeQuitar) {
+    s += '<div class="dica" style="border-color:#2668d6"><b>Dá para quitar o carro inteiro</b>'
+       + '<span>o saldo hoje é ' + brl(C.saldo) + '. Isso libera ' + brl(C.parcela)
+       + ' por mês na hora e mata a dívida mais cara que vocês têm.</span></div>';
+  }
+
+  var dif = Math.abs(ganhoB - ganhoA);
+  s += '<div class="carta ' + (melhor === 'B' ? 'ok' : 'av') + '" style="margin-top:12px">'
+     + '<b>' + (podeQuitar
+        ? 'Quite o carro. Acaba com 1,5351% ao mês e devolve ' + brl(C.parcela) + ' por mês.'
+        : (melhor === 'B'
+           ? 'Antecipe as últimas parcelas. Rende ' + brl(dif) + ' a mais que deixar parado.'
+           : 'Deixe na caixinha. Antecipar renderia ' + brl(dif) + ' a menos.'))
+     + '</b><div class="mini" style="margin-top:6px">'
+     + 'Regra que não muda: <b>primeiro</b> a reserva de 6 meses tem que estar de pé. '
+     + 'Só o que passar disso é que vai para o carro.</div></div>';
+  el.innerHTML = s;
 }
 
 function enviar(tipo, dados, alvo, feito){
