@@ -245,14 +245,23 @@
 
   <!-- ============ CARTEIRA ============ -->
   <section id="carteira" class="aba">
+    <div class="carta" id="c-aviso" style="display:none"></div>
     <div class="carta">
       <h2>Ações e fundos</h2>
       <div class="grande" id="c-total">—</div>
       <div class="nota" id="c-result">—</div>
     </div>
     <div class="carta">
-      <h2>Posições</h2>
+      <h2>Vou aportar. O que compro?</h2>
+      <label>Quanto</label>
+      <input id="a-valor" class="valor" inputmode="decimal" placeholder="0,00"
+             oninput="montarAporte()">
+      <div id="a-saida"></div>
+    </div>
+    <div class="carta">
+      <h2>Posições hoje</h2>
       <table id="tab-carteira"></table>
+      <div class="mini">Preço alvo, teto e fatia alvo são do seu agente de dividendos.</div>
     </div>
   </section>
 
@@ -544,12 +553,83 @@ function desenhar(){
       + (res>=0?'var(--verde)':'var(--vermelho)')+'">'+brl(res)+'</b>'
     : 'não consegui ler a carteira agora';
   var tc='';
-  for (var c2=0;c2<D.carteira.length;c2++)
-    tc += '<tr><td><b>'+D.carteira[c2].ativo+'</b><div class="mini">'+D.carteira[c2].status
-        + '</div></td><td>'+brl(D.carteira[c2].hoje)+'</td></tr>';
+  for (var c2=0;c2<D.carteira.length;c2++){
+    var a = D.carteira[c2];
+    var cor = a.acao === 'esperar' ? 'var(--vermelho)'
+            : (a.acao === 'comprar' ? 'var(--verde)' : 'var(--cinza)');
+    tc += '<tr><td><b>'+a.ativo+'</b><div class="mini" style="color:'+cor+'">'
+        + a.status + '</div><div class="mini">tem ' + a.pct + '% · alvo ' + a.pct_alvo
+        + '%</div></td><td>'+brl(a.hoje)+'</td></tr>';
+  }
   document.getElementById('tab-carteira').innerHTML = tc || '<tr><td class="mini">sem dados</td></tr>';
+
+  // o aviso que importa: concentracao
+  var av = document.getElementById('c-aviso');
+  if (av) {
+    if (D.concentrado && D.concentrado.length) {
+      var z = D.concentrado[0];
+      av.className = 'carta er';
+      av.style.display = 'block';
+      av.innerHTML = '<b>' + z.ativo + ' é ' + z.pct + '% da sua carteira</b>'
+        + '<div class="mini" style="margin-top:5px;color:inherit">O alvo dele é '
+        + z.pct_alvo + '%. Uma carteira pequena concentrada num papel só anda com ele. '
+        + 'Não é para vender agora: é para os próximos aportes irem todos nos outros, '
+        + 'até a fatia cair sozinha.</div>';
+    } else { av.style.display = 'none'; }
+  }
+  montarAporte();
   desenharPlano();
 }
+// "Vou aportar X. O que compro?" — distribui pelo que esta mais longe da
+// fatia alvo, pulando o que passou do teto de preco. O dinheiro novo entra
+// no calculo da fatia, senao a conta fica errada em carteira pequena.
+function montarAporte(){
+  var el = document.getElementById('a-saida');
+  if (!el || !D || !D.carteira) return;
+  var valor = num((document.getElementById('a-valor')||{}).value || '');
+  var cabecalho = '';
+  if (!D.aporte_liberado) {
+    cabecalho = '<div class="carta av" style="margin:12px 0 0"><b>Hoje ainda não é hora de aportar.</b>'
+      + '<div class="mini" style="margin-top:5px;color:inherit">Existe dívida a 1,5351% ao mês '
+      + '(o carro) e nenhum fundo ganha dela. Isso muda em <b>' + (D.aporte_quando || 'set/27')
+      + '</b>. A conta abaixo é para quando chegar lá — ou se entrar comissão que mude o quadro.</div></div>';
+  }
+  if (!valor) { el.innerHTML = cabecalho; return; }
+
+  var total = D.carteira_hoje + valor;
+  var alvos = [];
+  for (var i=0;i<D.carteira.length;i++){
+    var a = D.carteira[i];
+    if (a.acao === 'esperar') continue;
+    var falta = (a.pct_alvo / 100) * total - a.hoje;
+    if (falta > 0) alvos.push({ ativo: a.ativo, falta: falta, preco: a.preco, pct_alvo: a.pct_alvo });
+  }
+  var soma = 0;
+  for (var k=0;k<alvos.length;k++) soma += alvos[k].falta;
+  if (!soma) { el.innerHTML = cabecalho + '<div class="mini" style="margin-top:10px">'
+    + 'Com esse valor a carteira já fica equilibrada. Qualquer um dos que não passaram '
+    + 'do teto serve.</div>'; return; }
+
+  alvos.sort(function(a,b){ return b.falta - a.falta; });
+  var s = cabecalho + '<div class="nota" style="margin:14px 0 6px">Dividindo <b>' + brl(valor)
+        + '</b> para aproximar a carteira das fatias alvo:</div><table>';
+  for (var j=0;j<alvos.length;j++){
+    var parte = Math.min(alvos[j].falta, valor * alvos[j].falta / soma);
+    if (parte < 1) continue;
+    var cotas = alvos[j].preco ? Math.floor(parte / alvos[j].preco) : 0;
+    s += '<tr><td><b>' + alvos[j].ativo + '</b><div class="mini">'
+       + (cotas ? 'cerca de ' + cotas + (cotas === 1 ? ' cota' : ' cotas') + ' · ' : '')
+       + 'alvo ' + alvos[j].pct_alvo + '%</div></td><td>' + brl(parte) + '</td></tr>';
+  }
+  s += '</table>';
+  if (D.caros && D.caros.length) {
+    s += '<div class="mini" style="margin-top:10px">Fora da lista: <b>'
+       + D.caros.map(function(c){ return c.ativo; }).join(', ')
+       + '</b> — passaram do teto de preço. Comprar caro estraga o dividendo futuro.</div>';
+  }
+  el.innerHTML = s;
+}
+
 function desenharPlano(){
   var pat = D.patrimonio_total, meta = D.meta || 100000;
   document.getElementById('p-hoje').textContent = brl(pat);
