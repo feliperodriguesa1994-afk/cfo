@@ -294,6 +294,7 @@
 
 <script>
 window.CFO_API = "https://n8n.srv1821241.hstgr.cloud/webhook";
+window.CFO_VERSAO = "202611010317";
 
 var API = window.CFO_API || 'https://n8n.srv1821241.hstgr.cloud/webhook';
 var TOKEN = '', PAPEL = '', D = null;
@@ -379,6 +380,7 @@ function abrirApp(nome, papel){
   document.body.className = 'dentro' + (papel==='master' ? ' master' : '');
   document.getElementById('quem').textContent =
     nome + (papel==='master' ? '' : ' · lança e visualiza');
+  if (window.CFO_VERSAO) document.getElementById('quem').textContent += ' · v' + String(window.CFO_VERSAO).slice(-6);
   if (papel !== 'master') document.getElementById('saldos-leitura').style.display='block';
 
   var h = montarCartoes();
@@ -901,6 +903,24 @@ function comprar(){
     if (t) { TOKEN=t; PAPEL=localStorage.getItem('cfo_p')||'';
              abrirApp(localStorage.getItem('cfo_n')||'', PAPEL); }
   } catch(e){}
+})();
+</script>
+<script>
+// Se o servidor ja tem versao mais nova que a que esta aberta, recarrega
+// uma vez so. A trava no sessionStorage impede laco infinito.
+(function(){
+  try {
+    if (sessionStorage.getItem("cfo_recarregou") === window.CFO_VERSAO) return;
+    fetch(location.pathname + "?cb=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.text(); })
+      .then(function(t){
+        var m = t.match(/CFO_VERSAO = "(\d+)"/);
+        if (m && m[1] !== window.CFO_VERSAO) {
+          sessionStorage.setItem("cfo_recarregou", m[1]);
+          location.reload();
+        }
+      }).catch(function(){});
+  } catch (e) {}
 })();
 </script>
 </body>
