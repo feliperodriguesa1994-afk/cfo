@@ -68,6 +68,10 @@
   .cartao.on{border-color:var(--tinta);background:#eef1f5}
   .cartao b{display:block;font-size:14px}
   .cartao span{font-size:11px;color:var(--cinza)}
+  .cartao.melhor{border-color:var(--verde);background:#eefaf3}
+  .cartao u{display:block;text-decoration:none;font-size:11px;color:var(--verde);font-weight:700}
+  .sugestao{background:#eefaf3;border:1px solid #b6e2c8;border-radius:13px;
+            padding:12px 14px;margin:8px 0 4px;font-size:14px;line-height:1.4}
   .ind{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--linha)}
   .ind:last-child{border-bottom:0}
   .bolinha{width:11px;height:11px;border-radius:50%;margin-top:5px;flex:0 0 11px}
@@ -121,13 +125,15 @@
       </label>
       <input type="file" id="arquivo" accept="image/*" capture="environment"
              style="display:none" onchange="mandarFoto(this)">
-      <input id="l-valor" class="valor" inputmode="decimal" placeholder="0,00">
+      <input id="l-valor" class="valor" inputmode="decimal" placeholder="0,00"
+             oninput="sugerirCartao()">
 
       <label>No que foi?</label>
       <input id="l-desc" placeholder="mercado, almoço, farmácia...">
       <div class="chips" id="sugestoes"></div>
 
       <label>Pagou com o quê?</label>
+      <div class="sugestao" id="sugestao-cartao" style="display:none"></div>
       <div class="cartoes" id="cartoes"></div>
 
       <button onclick="lancar()">Lançar gasto</button>
@@ -366,11 +372,7 @@ function abrirApp(nome, papel){
     nome + (papel==='master' ? '' : ' · lança e visualiza');
   if (papel !== 'master') document.getElementById('saldos-leitura').style.display='block';
 
-  var h = '';
-  for (var i=0;i<CARTOES.length;i++)
-    h += '<div class="cartao' + (CARTOES[i].v===fonteEscolhida ? ' on':'')
-       + '" data-v="' + CARTOES[i].v + '"><b>' + CARTOES[i].n + '</b><span>'
-       + CARTOES[i].d + '</span></div>';
+  var h = montarCartoes();
   var box = document.getElementById('cartoes');
   var boxE = document.getElementById('cartoes-e');
   box.innerHTML = h; boxE.innerHTML = h;
@@ -392,6 +394,50 @@ function abrirApp(nome, papel){
   };
   carregar();
 }
+// Sugere o cartao com maior prazo e mostra, em dinheiro, o que isso vale
+// para o valor que ele digitou. Comprar logo depois do fechamento da quase
+// um mes a mais de prazo, e esse dinheiro fica rendendo na caixinha.
+// Monta os cartoes. Com o prazo que vem do servidor, o que paga mais tarde
+// fica em cima e marcado de verde.
+function montarCartoes(){
+  var lista = (D && D.ranking_cartoes && D.ranking_cartoes.length)
+    ? D.ranking_cartoes.map(function(c){
+        return { v: c.codigo, n: c.nome.replace(' 3586','').replace(' 4466',''),
+                 d: 'paga em ' + c.vence + ' · ' + c.dias + ' dias', dias: c.dias }; })
+    : CARTOES.map(function(c){ return { v:c.v, n:c.n, d:c.d, dias:null }; });
+  var s = '';
+  for (var i=0;i<lista.length;i++){
+    var melhor = lista[i].dias !== null && i === 0;
+    s += '<div class="cartao' + (lista[i].v===fonteEscolhida ? ' on':'')
+       + (melhor ? ' melhor':'') + '" data-v="' + lista[i].v + '"><b>' + lista[i].n
+       + '</b><span>' + lista[i].d + '</span>' + (melhor ? '<u>maior prazo</u>' : '') + '</div>';
+  }
+  return s;
+}
+
+function sugerirCartao(){
+  var el = document.getElementById('sugestao-cartao');
+  if (!el || !D || !D.ranking_cartoes || !D.ranking_cartoes.length) return;
+  var melhor = D.ranking_cartoes[0], atual = null;
+  for (var i=0;i<D.ranking_cartoes.length;i++)
+    if (D.ranking_cartoes[i].codigo === fonteEscolhida) atual = D.ranking_cartoes[i];
+  el.style.display = 'block';
+  var valor = num((document.getElementById('l-valor')||{}).value || '');
+  var txt = 'Hoje o maior prazo é o <b>' + melhor.nome + '</b>: paga só em <b>'
+          + melhor.vence + '</b>, daqui a ' + melhor.dias + ' dias.';
+  if (atual && atual.codigo !== melhor.codigo) {
+    var g = melhor.dias - atual.dias;
+    txt += '<br>No ' + atual.nome + ' você paga <b>' + g + ' dias antes</b>.';
+    if (valor) {
+      var rende = valor * (D.taxa || 0.008386) / 30 * g;
+      txt += ' Nessa compra isso vale <b>' + brl(rende) + '</b>.';
+    }
+  } else if (atual) {
+    txt += '<br><b>É o que está escolhido. Certo.</b>';
+  }
+  el.innerHTML = txt;
+}
+
 function ligaCartoes(box, escolheu){
   var ds = box.children;
   for (var i=0;i<ds.length;i++) ds[i].onclick = function(){
@@ -555,6 +601,11 @@ function desenharPlano(){
       + '<b>Vocês nunca ficam com pouco dinheiro na conta</b> — o aperto é na sobra, não no saldo.';
   }
   simular();
+  var cx = document.getElementById('cartoes');
+  if (cx) { cx.innerHTML = montarCartoes(); ligaCartoes(cx, function(v){ fonteEscolhida = v; sugerirCartao(); }); }
+  var cxe = document.getElementById('cartoes-e');
+  if (cxe) { cxe.innerHTML = montarCartoes(); ligaCartoes(cxe, function(v){ fonteEnxoval = v; }); }
+  sugerirCartao();
 
   var CORES = {ok:'#22a05e', atencao:'#e8a218', risco:'#d64038'};
   var h = '';
