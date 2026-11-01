@@ -402,7 +402,7 @@ function abrirApp(nome, papel){
 function montarCartoes(){
   var lista = (D && D.ranking_cartoes && D.ranking_cartoes.length)
     ? D.ranking_cartoes.map(function(c){
-        return { v: c.codigo, n: c.nome.replace(' 3586','').replace(' 4466',''),
+        return { v: c.codigo, n: c.nome.replace(/\s+\d{3,6}$/, ''),
                  d: 'paga em ' + c.vence + ' · ' + c.dias + ' dias', dias: c.dias }; })
     : CARTOES.map(function(c){ return { v:c.v, n:c.n, d:c.d, dias:null }; });
   var s = '';
