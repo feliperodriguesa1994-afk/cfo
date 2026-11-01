@@ -254,8 +254,8 @@
     <div class="carta">
       <h2>Vou aportar. O que compro?</h2>
       <label>Quanto</label>
-      <input id="a-valor" class="valor" inputmode="decimal" placeholder="0,00"
-             oninput="montarAporte()">
+      <input id="a-valor" class="valor" inputmode="decimal" placeholder="0,00">
+      <button onclick="perguntarAporte()">Me diga o que comprar</button>
       <div id="a-saida"></div>
     </div>
     <div class="carta">
@@ -577,12 +577,44 @@ function desenhar(){
         + 'até a fatia cair sozinha.</div>';
     } else { av.style.display = 'none'; }
   }
-  montarAporte();
+  var sa = document.getElementById('a-saida');
+  if (sa && !sa.innerHTML) sa.innerHTML = avisoAporte();
   desenharPlano();
 }
 // "Vou aportar X. O que compro?" — distribui pelo que esta mais longe da
 // fatia alvo, pulando o que passou do teto de preco. O dinheiro novo entra
 // no calculo da fatia, senao a conta fica errada em carteira pequena.
+// Quem decide o que comprar e o AGENTE DE DIVIDENDOS, com a metodologia
+// dele. Eu so levo o valor e trago a resposta. Ele pode indicar ativo que
+// o Felipe ainda nao tem, e e isso que a gente quer.
+function perguntarAporte(){
+  var valor = num((document.getElementById('a-valor')||{}).value || '');
+  var el = document.getElementById('a-saida');
+  if (!valor) { aviso('a-saida','Digite quanto você vai aportar.','er'); return; }
+  el.innerHTML = '<div class="carta av" style="margin:14px 0 0"><b>Perguntando ao analista...</b>'
+    + '<div class="mini" style="color:inherit">ele está olhando preço, teto e a fatia '
+    + 'de cada ativo. Leva alguns segundos.</div></div>';
+  chamar('/painel-aporte', { method:'POST', body: JSON.stringify({ valor: valor }) })
+    .then(function(j){
+      if (!j.ok) { aviso('a-saida', j.erro || 'Não consegui falar com o analista.','er'); return; }
+      var txt = String(j.resposta)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+        .replace(/\n/g,'<br>');
+      el.innerHTML = avisoAporte() + '<div class="carta" style="margin:14px 0 0;font-size:14px;'
+        + 'line-height:1.55">' + txt + '</div>';
+    })
+    .catch(function(e){ aviso('a-saida','Falhou: ' + e.message,'er'); });
+}
+
+function avisoAporte(){
+  if (D && D.aporte_liberado) return '';
+  return '<div class="carta av" style="margin:14px 0 0"><b>Lembrete: hoje ainda não é hora.</b>'
+    + '<div class="mini" style="margin-top:4px;color:inherit">Existe dívida a 1,5351% ao mês '
+    + '(o carro) e nenhum fundo ganha dela. Isso muda em <b>' + ((D&&D.aporte_quando)||'set/27')
+    + '</b>. Use isto para planejar, ou se entrar comissão que mude o quadro.</div></div>';
+}
+
 function montarAporte(){
   var el = document.getElementById('a-saida');
   if (!el || !D || !D.carteira) return;
