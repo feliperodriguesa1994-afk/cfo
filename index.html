@@ -249,6 +249,28 @@
       <div id="c-saida"></div>
     </div>
     <div class="carta">
+      <h2>E se…</h2>
+      <div class="nota">Mexa num número e veja o que acontece com o mês mais
+        apertado e com a meta. Nada aqui altera o plano: é só simulação.</div>
+
+      <label>E se eu gastar mais no enxoval?</label>
+      <input id="s-enxoval" class="valor" inputmode="decimal" placeholder="1.500,00"
+             oninput="simularCenarios()">
+      <div class="mini">Parcelado em 10x, que é o que você vem fazendo.</div>
+
+      <label style="margin-top:14px;display:block">E se vier comissão extra?</label>
+      <input id="s-comissao" class="valor" inputmode="decimal" placeholder="15.000,00"
+             oninput="simularCenarios()">
+      <div class="mini">Valor bruto. Eu desconto imposto e DSR.</div>
+
+      <label style="margin-top:14px;display:block">E se eu antecipar parcelas do carro?</label>
+      <input id="s-carro" class="valor" inputmode="numeric" placeholder="3"
+             oninput="simularCenarios()">
+      <div class="mini">Quantas parcelas do fim, pagas agora.</div>
+
+      <div id="s-saida" style="margin-top:16px"></div>
+    </div>
+    <div class="carta">
       <h2>O que eu olho todo mês</h2>
       <div id="indicadores"></div>
     </div>
@@ -323,7 +345,7 @@
 
 <script>
 window.CFO_API = "https://n8n.srv1821241.hstgr.cloud/webhook";
-window.CFO_VERSAO = "202611141558";
+window.CFO_VERSAO = "202611141617";
 
 var API = window.CFO_API || 'https://n8n.srv1821241.hstgr.cloud/webhook';
 var TOKEN = '', PAPEL = '', D = null;
@@ -413,7 +435,18 @@ function sair(){
 function pagarFatura(i){
   var f = D.faturas_abertas[i];
   if (!f || f.pago) return;
-  if (!confirm('Confirmar pagamento de ' + f.nome + ' no valor de ' + brl(f.valor) + '?')) return;
+  // O valor da fatura quase nunca é exatamente o previsto. Deixo editar, senão
+  // ele registra um número que não foi o que saiu da conta e o caixa erra.
+  var dig = prompt('Quanto saiu de verdade na fatura ' + f.nome + '?',
+                   String(f.valor.toFixed(2)).replace('.', ','));
+  if (dig === null) return;
+  var val = Number(String(dig).replace(/[R$\s.]/g, '').replace(',', '.'));
+  if (!isFinite(val) || val <= 0) { aviso('r-fatura','Valor inválido.','er'); return; }
+  if (Math.abs(val - f.valor) > 0.009) {
+    if (!confirm('Você digitou ' + brl(val) + ', diferente dos ' + brl(f.valor)
+      + ' previstos. Uso o que você digitou. Confirma?')) return;
+  }
+  f = { nome: f.nome, valor: val, codigo: f.codigo };
   aviso('r-fatura','registrando...','av');
   var hoje = new Date(Date.now() - 3*3600*1000);
   var dd = String(hoje.getDate()).padStart(2,'0') + '/'
@@ -867,6 +900,85 @@ function desenharPlano(){
        + y.t + '</b><span>' + y.x + '</span></div>';
   }
   document.getElementById('dicas').innerHTML = d;
+}
+
+// ===== E SE... =====
+// Tres cenarios sobre a MESMA projecao, para ele ver o efeito antes de
+// decidir. A conta roda aqui na tela: responde enquanto ele digita.
+//
+// O que cada um mexe, e por que assim:
+//   enxoval   -> parcela em 10x a partir do mes que vem. So as parcelas que
+//                caem ATE o mes olhado pesam nele.
+//   comissao  -> entra liquida no fim deste mes e fica rendendo dali para a
+//                frente, entao soma em todos os meses seguintes.
+//   carro     -> antecipar as ULTIMAS parcelas tira dinheiro AGORA e nao
+//                reduz a parcela mensal. E a pegadinha: o caixa piora antes
+//                de melhorar, e so melhora depois que a divida acabaria.
+function simularCenarios(){
+  if (!D || !D.meses) return;
+  var enx  = num((document.getElementById('s-enxoval')||{}).value || '');
+  var com  = num((document.getElementById('s-comissao')||{}).value || '');
+  var carr = Math.max(0, Math.min(11, Math.round(num((document.getElementById('s-carro')||{}).value || ''))));
+  var el = document.getElementById('s-saida');
+  if (!enx && !com && !carr) { el.innerHTML = ''; return; }
+
+  var taxa = D.taxa || 0.008418;
+  var parcelaEnx = enx / 10;
+  var comLiquida = com * (D.razao_liquido || 0.8541685);
+  var parcelaCarro = (D.carro && D.carro.parcela) || 2139.47;
+  // antecipar: paga hoje o valor presente das ultimas parcelas
+  var custoAntecipa = 0;
+  for (var k = 0; k < carr; k++) {
+    var falta = (D.carro && D.carro.parcelas_ate_set ? D.carro.parcelas_ate_set : 11) - k;
+    custoAntecipa += parcelaCarro / Math.pow(1 + ((D.carro && D.carro.taxa_antecipa) || 0.01512), Math.max(1, falta));
+  }
+
+  var piorA = null, piorB = null, fimA = 0, fimB = 0;
+  for (var i = 0; i < D.meses.length; i++) {
+    var m = D.meses[i];
+    var piso = (D.fixo + (i >= 3 ? D.bebe_mes : 0)) * 6;
+    var novo = m.caixa;
+    if (enx)  novo -= parcelaEnx * Math.min(i, 10);          // 1a parcela no mes seguinte
+    if (com)  novo += comLiquida * Math.pow(1 + taxa, i);    // entra agora e rende
+    // sai agora e para de render. A parcela mensal NAO muda: antecipar
+    // abate o FIM do financiamento, nao o valor de cada mes.
+    if (carr) novo -= custoAntecipa * Math.pow(1 + taxa, i);
+    if (!piorA || (m.caixa - piso) < piorA.folga) piorA = { mes: m.mes, caixa: m.caixa, folga: m.caixa - piso };
+    if (!piorB || (novo - piso) < piorB.folga)    piorB = { mes: m.mes, caixa: novo, folga: novo - piso };
+    fimA = m.caixa; fimB = novo;
+  }
+
+  var dFolga = piorB.folga - piorA.folga;
+  var dFim = fimB - fimA;
+  var cor = piorB.folga < 0 ? 'var(--vermelho)' : (dFolga < 0 ? 'var(--amarelo)' : 'var(--verde)');
+  var h = '<div class="linha"><span>Mês mais apertado (' + piorB.mes + ')</span><b style="color:'
+        + cor + '">' + brl(piorB.caixa) + '</b></div>'
+        + '<div class="linha"><span>Folga nele</span><b style="color:' + cor + '">'
+        + brl(piorB.folga) + '</b></div>'
+        + '<div class="linha"><span>Antes era</span><b>' + brl(piorA.folga) + '</b></div>'
+        + '<div class="linha"><span>No fim do período</span><b>' + brl(fimB)
+        + (Math.abs(dFim) > 1 ? ' <small>(' + (dFim > 0 ? '+' : '') + brl(dFim) + ')</small>' : '')
+        + '</b></div>';
+
+  h += '<div class="nota" style="margin-top:10px">';
+  if (piorB.folga < 0) {
+    h += '<b style="color:var(--vermelho)">Isso fura a reserva em ' + brl(-piorB.folga)
+       + ' em ' + piorB.mes + '.</b> Não quer dizer ficar sem dinheiro: quer dizer '
+       + 'cair abaixo dos 6 meses de reserva que você mesmo definiu.';
+  } else if (dFolga < 0) {
+    h += 'Cabe, mas come <b>' + brl(-dFolga) + '</b> da folga. Sobram <b>'
+       + brl(piorB.folga) + '</b> em ' + piorB.mes + '.';
+  } else {
+    h += 'Melhora a folga em <b>' + brl(dFolga) + '</b>.';
+  }
+  if (carr) {
+    h += '<br><br><b>Sobre antecipar:</b> custa <b>' + brl(custoAntecipa)
+       + '</b> hoje e <b>não reduz a parcela mensal</b> — você segue pagando '
+       + brl(parcelaCarro) + ' todo mês. O ganho só aparece quando o '
+       + 'financiamento terminaria. Antes disso, o caixa fica pior.';
+  }
+  h += '</div>';
+  el.innerHTML = h;
 }
 
 // Simulador: entrou comissao, para onde ela vai?
