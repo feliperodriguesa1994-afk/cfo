@@ -166,6 +166,7 @@
     <div class="carta">
       <h2>Dinheiro que dá para usar</h2>
       <div class="grande" style="color:var(--verde)" id="v-caixa">—</div>
+      <div class="nota" id="t-caixa-origem"></div>
       <div class="barra"><i id="b-piso" style="background:var(--vermelho)"></i></div>
       <div class="nota" id="t-piso">—</div>
     </div>
@@ -173,6 +174,20 @@
       <h2>Patrimônio</h2>
       <div id="lista-patrimonio"></div>
       <div class="mini" id="t-fgts"></div>
+    </div>
+    <div class="carta" id="carta-faturas" style="display:none">
+      <h2>Faturas deste mês</h2>
+      <div class="nota">Quando pagar, toque em "paguei". Eu desconto do caixa
+        na hora e não conto como gasto novo, porque a compra já foi contada.</div>
+      <div id="lista-faturas"></div>
+      <div id="r-fatura"></div>
+    </div>
+    <div class="carta" id="carta-carro" style="display:none">
+      <h2>O carro</h2>
+      <div id="lista-carro"></div>
+      <div class="mini">Fica fora da meta dos R$ 100 mil de propósito: não
+        rende, perde valor todo ano e só vira dinheiro se você ficar a pé.
+        Está aqui porque é seu e porque gera IPVA.</div>
     </div>
     <div class="carta">
       <h2>Próximos meses</h2>
@@ -279,6 +294,20 @@
       <div id="lista-saldos"></div>
       <div class="mini">Só o usuário principal muda estes valores.</div>
     </div>
+
+    <div class="carta">
+      <h2>Trocar a minha senha</h2>
+      <div class="nota">Vale só para a sua conta. A senha não sai deste
+        aparelho: o que viaja é só um código embaralhado dela.</div>
+      <input id="sen1" type="password" autocomplete="new-password"
+             placeholder="senha nova">
+      <input id="sen2" type="password" autocomplete="new-password"
+             placeholder="repita a senha nova">
+      <button onclick="trocarSenha()">Trocar senha</button>
+      <div id="r-senha"></div>
+      <div class="mini">Mínimo de 8 caracteres. Depois de trocar, você entra
+        de novo com a senha nova.</div>
+    </div>
   </section>
 </main>
 
@@ -294,7 +323,7 @@
 
 <script>
 window.CFO_API = "https://n8n.srv1821241.hstgr.cloud/webhook";
-window.CFO_VERSAO = "202611121500";
+window.CFO_VERSAO = "202611141558";
 
 var API = window.CFO_API || 'https://n8n.srv1821241.hstgr.cloud/webhook';
 var TOKEN = '', PAPEL = '', D = null;
@@ -365,14 +394,68 @@ function entrar(){
     .then(function(j){
       if (!j.ok) { aviso('r-entrar', j.erro || 'Usuário ou senha errados.','er'); return; }
       TOKEN = j.token; PAPEL = j.papel;
+      // guardo tambem o LOGIN: a troca de senha precisa dele para montar o
+      // hash, que e sha256('cfo|usuario|senha'). Sem isso nao da para trocar.
       try { localStorage.setItem('cfo_t',TOKEN); localStorage.setItem('cfo_p',PAPEL);
-            localStorage.setItem('cfo_n',j.nome); } catch(e){}
+            localStorage.setItem('cfo_n',j.nome); localStorage.setItem('cfo_u',u); } catch(e){}
       abrirApp(j.nome, j.papel);
     }).catch(function(e){ aviso('r-entrar','Não consegui entrar: '+e.message,'er'); });
 }
 function sair(){
   try { localStorage.clear(); } catch(e){}
   location.reload();
+}
+// Troca a propria senha. A senha em texto NUNCA sai do navegador: mando so o
+// sha256. O servidor sabe quem sou pelo token, que ja e o hash da senha atual,
+// entao nao preciso digitar a senha velha de novo.
+// Dar baixa numa fatura: grava um lançamento de pagamento, que o caixa
+// desconta e o "gasto do mês" ignora (a compra já contou quando foi feita).
+function pagarFatura(i){
+  var f = D.faturas_abertas[i];
+  if (!f || f.pago) return;
+  if (!confirm('Confirmar pagamento de ' + f.nome + ' no valor de ' + brl(f.valor) + '?')) return;
+  aviso('r-fatura','registrando...','av');
+  var hoje = new Date(Date.now() - 3*3600*1000);
+  var dd = String(hoje.getDate()).padStart(2,'0') + '/'
+         + String(hoje.getMonth()+1).padStart(2,'0') + '/' + hoje.getFullYear();
+  chamar('/painel-salvar', { method:'POST', body: JSON.stringify({
+    tipo:'despesa',
+    dados:{
+      'Data': dd,
+      'Descrição': 'Pagamento fatura ' + f.nome,
+      'Valor R$': String(f.valor.toFixed(2)).replace('.',','),
+      'Categoria': 'Financeiros',
+      'Tipo': 'Variável',
+      'Fonte': 'Débito',
+      'Quem': 'Felipe',
+      'Mês': ['janeiro','fevereiro','março','abril','maio','junho','julho',
+              'agosto','setembro','outubro','novembro','dezembro'][hoje.getMonth()],
+      'Ano': hoje.getFullYear()
+    }
+  })}).then(function(j){
+    if (j && j.erro) { aviso('r-fatura', j.erro, 'er'); return; }
+    aviso('r-fatura','Baixa registrada. Atualizando...','ok');
+    setTimeout(carregar, 1200);
+  }).catch(function(e){ aviso('r-fatura','Não consegui registrar: '+e.message,'er'); });
+}
+function trocarSenha(){
+  var a = document.getElementById('sen1').value;
+  var b = document.getElementById('sen2').value;
+  if (a.length < 8) { aviso('r-senha','A senha precisa de pelo menos 8 caracteres.','er'); return; }
+  if (a !== b)      { aviso('r-senha','As duas senhas estão diferentes.','er'); return; }
+  var usuario = '';
+  try { usuario = localStorage.getItem('cfo_u') || ''; } catch(e){}
+  if (!usuario) { aviso('r-senha','Não sei de quem é a sessão. Saia e entre de novo.','er'); return; }
+  aviso('r-senha','trocando...','av');
+  hashSenha(usuario, a).then(function(h){
+    return chamar('/painel-senha', { method:'POST', body: JSON.stringify({ novo: h }) });
+  }).then(function(j){
+    if (j && j.erro) { aviso('r-senha', j.erro, 'er'); return; }
+    document.getElementById('sen1').value = '';
+    document.getElementById('sen2').value = '';
+    aviso('r-senha','Senha trocada. Entre de novo com a nova.','ok');
+    setTimeout(sair, 2500);
+  }).catch(function(e){ aviso('r-senha','Não consegui trocar: '+e.message,'er'); });
 }
 function abrirApp(nome, papel){
   document.getElementById('entrada').style.display='none';
@@ -488,6 +571,52 @@ function desenhar(){
     + 'o outro é o que o banco tira.';
 
   document.getElementById('v-caixa').textContent = brl(D.caixa);
+  // De onde esse numero vem. Antes era o saldo congelado do dia em que ele
+  // informou: bastava pagar uma fatura para ele ficar mentiroso.
+  var elo = document.getElementById('t-caixa-origem');
+  if (D.caixa_em && D.caixa_movimento_qtd) {
+    var sinal = D.caixa_movimento < 0 ? '−' : '+';
+    elo.innerHTML = 'Você informou <b>' + brl(D.caixa_informado) + '</b> em '
+      + D.caixa_em + '. Desde então ' + sinal + ' <b>'
+      + brl(Math.abs(D.caixa_movimento)) + '</b> em ' + D.caixa_movimento_qtd
+      + ' lançamento(s) que entraram ou saíram da conta.';
+  } else if (D.caixa_em) {
+    elo.innerHTML = 'Saldo que você informou em ' + D.caixa_em
+      + '. Nada entrou nem saiu da conta desde então.';
+  } else {
+    elo.innerHTML = '';
+  }
+  // as faturas do mes, com o botao de dar baixa
+  if (D.faturas_abertas && D.faturas_abertas.length) {
+    document.getElementById('carta-faturas').style.display = 'block';
+    var hf = '';
+    for (var f = 0; f < D.faturas_abertas.length; f++) {
+      var x = D.faturas_abertas[f];
+      hf += '<div class="linha"><span>' + x.nome
+          + '<br><small style="opacity:.6">vence dia ' + x.vence + '</small></span>'
+          + '<span style="text-align:right"><b>' + brl(x.valor) + '</b><br>'
+          + (x.pago
+              ? '<small style="color:var(--verde)">✓ pago</small>'
+              : '<button style="padding:4px 10px;font-size:13px;margin:0" onclick="pagarFatura('
+                + f + ')">paguei</button>')
+          + '</span></div>';
+    }
+    document.getElementById('lista-faturas').innerHTML = hf;
+  }
+  // o carro
+  if (D.carro_patrimonio && D.carro_patrimonio.fipe) {
+    var C = D.carro_patrimonio;
+    var lin = function (nome, v, cor) {
+      return '<div class="linha"><span>' + nome + '</span><b'
+        + (cor ? ' style="color:' + cor + '"' : '') + '>' + brl(v) + '</b></div>';
+    };
+    document.getElementById('carta-carro').style.display = 'block';
+    document.getElementById('lista-carro').innerHTML =
+      lin('Vale hoje (tabela FIPE)', C.fipe)
+      + lin('Ainda devo (' + C.parcelas_restantes + ' parcelas)', -C.devendo, 'var(--vermelho)')
+      + lin('<b>O que é seu</b>', C.seu, 'var(--verde)')
+      + lin('IPVA + licenciamento, em janeiro', -(C.ipva_ano + C.licenciamento), 'var(--vermelho)');
+  }
   document.getElementById('b-piso').style.width =
     Math.min(100, 100*D.piso/Math.max(D.caixa,D.piso)) + '%';
   document.getElementById('t-piso').innerHTML =
